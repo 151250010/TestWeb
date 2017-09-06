@@ -10,7 +10,37 @@
          http://www.springframework.org/schema/context
           http://www.springframework.org/schema/context/spring-context.xsd">
 
-    <mvc:annotation-driven/>
+  <!--  全局的日期转换失败了，暂时没有找到解决方案
+   <bean class="org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter">
+        <property name="webBindingInitializer">
+            <bean class="bindinginitializers.MyWebBindingInitalizer"/>
+        </property>
+    </bean>
+   -->
+
+    <bean id="conversionService" class="org.springframework.format.support.FormattingConversionServiceFactoryBean">
+        <!--不使用默认的转换器-->
+        <property name="registerDefaultFormatters" value="false"/>
+
+        <!--支持@NumberFormat注解-->
+        <property name="formatters">
+            <set>
+                <bean class="org.springframework.format.number.NumberFormatAnnotationFormatterFactory"/>
+            </set>
+        </property>
+
+        <property name="formatterRegistrars">
+            <set>
+                <!--使用standard.DateTimeFormatterRegistrar 就可以了？ 不需要设置Pattern 只支持简单的"yyyy-MM-dd" 以及 "yyyyMMdd"?-->
+                <bean class="org.springframework.format.datetime.standard.DateTimeFormatterRegistrar"/>
+
+                <!--类路径下面有joda依赖的话，可以使用joda.DateTimeFormatterRegistrar-->
+            </set>
+        </property>
+
+    </bean>
+
+    <mvc:annotation-driven conversion-service="conversionService"/>
 
     <!--配置JSP　显示ViewResolver-->
     <bean class="org.springframework.web.servlet.view.InternalResourceViewResolver">
@@ -19,8 +49,11 @@
         <property name="suffix" value=".jsp"/>
     </bean>
 
-    <bean class="handlermapping.CustomRequestMappingHandlerMapping"/>
+    <!--<bean class="handlermapping.CustomRequestMappingHandlerMapping"/>-->
+    <!--<bean class="org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter"/>-->
 
     <context:component-scan base-package="source"/>
+
+    <mvc:resources mapping="/text/**" location="/resource/"/>
 
 </beans>
