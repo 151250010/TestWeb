@@ -5,10 +5,13 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.BeanFactoryUtils;
 import org.springframework.context.ApplicationContext;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.*;
+import org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter;
 import org.springframework.web.servlet.view.InternalResourceViewResolver;
+import utils.RequestPathUtil;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -27,6 +30,7 @@ public class CustomDispatcherServlet extends FrameworkServlet{
         LOGGER.debug("[CustomDispatcherServlet]: I got a request --> " + request.toString());
         //这里必须设置为DispatcherServlet.CONTEXT view才可以进行渲染？具体的实现有空再看了
         request.setAttribute(DispatcherServlet.class.getName() + ".CONTEXT", getWebApplicationContext()); //设置上下文
+        request.setAttribute(HandlerMapping.PATH_WITHIN_HANDLER_MAPPING_ATTRIBUTE, new RequestPathUtil().lookupRequestPath(request));
         doDispatch(request, response);
     }
 
@@ -68,9 +72,8 @@ public class CustomDispatcherServlet extends FrameworkServlet{
         Locale locale = request.getLocale(); //直接从request中获取语言
         response.setLocale(locale);
 
-        if (modelAndView.getStatus() != null) {
-            response.setStatus(modelAndView.getStatus().value());
-        }
+        Optional<HttpStatus> status = Optional.ofNullable(modelAndView.getStatus());
+        status.ifPresent(httpStatus -> response.setStatus(httpStatus.value()));
 
         String viewName = modelAndView.getViewName();
         View view;
@@ -157,7 +160,8 @@ public class CustomDispatcherServlet extends FrameworkServlet{
         }
 
         if (this.handlerAdapters.size() == 0) {
-            this.handlerAdapters = Collections.singletonList(new RequestMappingHandlerAdapter());
+            handlerAdapters.add(new HttpRequestHandlerAdapter()); //支持静态资源处理
+            handlerAdapters.add(new RequestMappingHandlerAdapter()); //支持@RequestMapping解析
             LOGGER.info("register a default request mapping handler adapter");
         }
 
@@ -167,11 +171,8 @@ public class CustomDispatcherServlet extends FrameworkServlet{
     private void initHandlerMappings(ApplicationContext applicationContext) {
 
         //先从webapplicationContext中获取bean
-//        Map<String, HandlerMapping> stringHandlerMappingMap = BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, HandlerMapping.class, true, false);
-//        this.handlerMappings = new ArrayList<>(stringHandlerMappingMap.values());
-
-        HandlerMapping handlerMapping = applicationContext.getBean(CustomRequestMappingHandlerMapping.class);
-        this.handlerMappings = Collections.singletonList(handlerMapping);
+        Map<String, HandlerMapping> stringHandlerMappingMap = BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, HandlerMapping.class, true, false);
+        this.handlerMappings = new ArrayList<>(stringHandlerMappingMap.values());
 
         if (handlerMappings.isEmpty()) {
             LOGGER.info("could not find a handler mapping instance from current application context!");
@@ -190,11 +191,4 @@ public class CustomDispatcherServlet extends FrameworkServlet{
 
     }
 
-   /* private void initHandlerMappings(ApplicationContext applicationContext) {
-        this.handlerMappings = new ArrayList<>();
-        HandlerMapping handlerMapping = applicationContext.getBean(CustomRequestMappingHandlerMapping.class);
-        if (handlerMapping != null) {
-            this.handlerMappings.add(handlerMapping);
-        }
-    }*/
 }
